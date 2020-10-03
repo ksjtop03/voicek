@@ -1,0 +1,2 @@
+mysqldump -u사용자 -p패스워드 --no-data 데이터베이스명 테이블명 > 저장할파일명
+ex) mysqldump -uroot -pnew1234! --no-data test pt_test > test.sql

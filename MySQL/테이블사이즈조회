@@ -1,0 +1,15 @@
+-- 전체테이블 사이즈 조회
+select table_schema as 'DATABASE',
+table_name AS 'TABLE',
+round(((data_length + index_length) / 1024 / 1024),2) 'Size in MB'
+from information_schema.TABLES
+order by (data_length + index_length) DESC;
+
+
+-- 개별 테이블 사이즈 조회
+
+select table_name AS 'TABLE',
+round(((data_length + index_length) / 1024 / 1024),2) 'SIZE in MB'
+from information_schema.TABLES
+where table_schema = "DB명"
+and table_name = "테이블명";

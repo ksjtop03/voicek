@@ -1,0 +1,31 @@
+■ LOCK 모니터링
+•락이란 DB의 자원을 동시 작업을 제어하기 위한 메커니즘. 락은 먼저 획득한 사용자에 의해 다른 사용자의 작업이 제한되며 락의 종류에 따라 작업 내용이 제한
+•PAS는 총 8개의 락이 존재
+
+•ACCESS SHARE: 테이블을 SELECT 시 획득하는 lock
+•ROW SHARE: SELECT FOR UPDATE, SELECT FOR SHARE 시 획득하는 lock
+•ROW EXCLUSIVE: DML 작업 시 획득하는 lock
+•SHARE UPDATE EXCLUSIVE: VACUUM, ANALYZE, CREATE INDEX CONCURRENTLY 작업 시에 획득하는 lock
+•SHARE: CREATE INDEX 작업 시 획득하는 lock
+•SHARE ROW EXCLUSIVE: 한 세션에서 데이터 변경을 막기 위해 획득하는 lock (명령어에 의해 실행되지 않음)
+•EXCLUSIVE: 병렬 프로세스에서 읽기만 가능
+•ACCESS EXCLUSIVE: ALTER TABLE, DROP TABLE, TRUNCATE, REINDEX, CLUSTER, and VACUUM FULL
+
+---------------------------------------------------------------------------------------------------------------
+
+-- Lock 정보 확인
+
+-- 전 버전
+SELECT bl.pid AS blocked_pid ,a.usename AS blocked_user ,ka.query AS blocking_statement ,TO_CHAR(now() - ka.query_start, 'HH24:MI:SS') AS blocking_duration ,kl.pid AS blocking_pid ,ka.usename AS blocking_user ,a.query AS blocked_statement ,TO_CHAR(now() - a.query_start, 'HH24:MI:SS') AS blocked_duration FROM pg_catalog.pg_locks bl JOIN pg_catalog.pg_stat_activity a ON bl.pid = a.pid JOIN pg_catalog.pg_locks kl JOIN pg_catalog.pg_stat_activity ka ON kl.pid=ka.pid ON bl.transactionid = kl.transactionid AND bl.pid != kl.pid OR (bl.relation=kl.relation AND bl.locktype=kl.locktype AND bl.pid != kl.pid) WHERE bl.granted = 'f';
+
+-- 9.5 이하 버전
+select pid, waiting, state, query from pg_stat_activity where waiting = 't';
+
+-- 9.6 이상 버전
+select pid as locker,pg_blocking_pids(pid) as waiting from pg_stat_activity where array_upper(pg_blocking_pids(pid), 1) > 0;
+
+select pid, query from pg_stat_activity where wait_event_type = 'Lock';
+
+-- 락 해결 확인
+•select pg_terminate_backend( PID ); --권장
+•select pg_cancel_backend( PID );

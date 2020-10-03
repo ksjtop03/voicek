@@ -1,0 +1,5 @@
+-- function 확인
+show function status where db = 'DB명';
+
+-- function 수정
+show create function FUNCTION명;

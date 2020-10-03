@@ -1,0 +1,5 @@
+-- procedure 확인
+show procedure status where db = 'DB명';
+
+-- procedure 수정
+show create procedure 프로시저명;

@@ -1,0 +1,2 @@
+<full dump ¸í·É¾î>
+mysqldump -uvocooDB_Admin -p --events --ignore-table=mysql.event --all-databases > dump_20160614.sql

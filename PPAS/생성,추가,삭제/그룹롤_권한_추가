@@ -1,0 +1,12 @@
+--1) DML권한 사용용도 그룹ROLE에 DML권한부여
+grant select, delete, insert, update on all tables in schema 스키마명 to 유저명;
+ex) grant select, delete, insert, update on all tables in schema ctfl to "H91150725";
+
+--2) 그룹롤 추가
+grant 그룹롤 to 유저명;
+ex) grant ctfl_dml to "H91150725";
+
+--원복
+1) revoke select, delete, insert, update on all tables in schema 스키마명 from 유저명;
+2) revoke 그룹롤 from 유저명;
+

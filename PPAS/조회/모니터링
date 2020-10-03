@@ -1,0 +1,9 @@
+top -d 1 -c -p "PID"
+
+ps x | grep INSERT
+
+strace -p "PID"
+
+
+
+top -d 1 -c -p 20382

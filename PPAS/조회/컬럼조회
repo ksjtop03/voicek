@@ -1,0 +1,7 @@
+-- 컬럼조회
+
+select table_name, column_name
+from information_schema.columns where table_name = 'event_hotdeal_coupn_req' and column_name = '테이블명';
+
+select table_name, column_name, data_type, character_maximum_length, character_octet_length,udt_name
+from information_schema.columns where table_name = '테이블명' order by ordinal_position;

@@ -1,0 +1,78 @@
+####################################################################
+ 간간히 이슈가 발생할 때 자사 대응 시 Bloating으로 인해 SQL지연되는 횟수가 많아 조사하는 것이며
+ 조사결과에 따라 PM Or 비정기로 Vacuum Full 작업 or Reindex 작업이 필요할 것 같습니다. 
+####################################################################
+
+-- TABLE Bloating 조사 SQL
+select a.oid::regclass,
+(a.relpages * 8192::bigint) as assize,
+(a.reltuples::numeric * b.rowsize) as esize,
+(a.relpages * 8192::bigint) / (a.reltuples::numeric * b.rowsize) as bloating
+from pg_class a left join
+(select starelid, sum(stawidth) as rowsize from pg_statistic group by starelid) b
+on (a.oid = b.starelid)
+where a.relkind in ('r','m') and a.relname <> 'pg_statistic'
+and a.relname <> 'pg_statistic'
+and (a.reltuples::numeric * b.rowsize) is not null
+and a.reltuples > 0 and a.relpages > 1
+and ((a.relpages * 8192::bigint) / (a.reltuples::numeric * b.rowsize)) > 5
+order by 4 desc;
+
+ 
+-- INDEX Bloating 조사 SQL
+select a.indrelid::regclass::text as t, a.indexrelid::regclass::text as i,
+(c.relpages * 8192::bigint) as asize, (b.reltuples::numeric * d.width) as esize,
+(c.relpages * 8192::bigint) / (b.reltuples::numeric * d.width) as bloating
+from pg_index a, pg_class b, pg_class c ,
+(select a.indrelid, a.indexrelid , (sum(b.stawidth) + 9) as width
+from pg_index a, pg_statistic b
+where a.indrelid = b.starelid and arraycontains(a.indkey, cast(b.staattnum::text as int2vector))
+group by a.indrelid, a.indexrelid) d
+where a.indrelid = b.oid
+and a.indrelid = d.indrelid and a.indexrelid = d.indexrelid
+and c.relpages > 4
+and b.relkind in ('r','m')
+and a.indrelid = b.oid
+and a.indexrelid = c.oid
+and ((c.relpages * 8192::bigint) / (b.reltuples::numeric * d.width)) > 5
+and (b.reltuples::numeric * d.width) > 0
+order by 5 desc;
+
+
+■ 대용량(5GB 이상) 테이블/인덱스일 경우, 2배 이상인 것 조사
+-- 5GB이상, 2배 이상 TABLE Bloating 조사 SQL
+select a.oid::regclass,
+           (a.relpages * 8192::bigint) as assize,
+           (a.reltuples::numeric * b.rowsize) as esize,
+           (a.relpages * 8192::bigint) / (a.reltuples::numeric * b.rowsize) as bloating
+from pg_class a left join
+           (select starelid, sum(stawidth) as rowsize from pg_statistic group by starelid) b
+           on (a.oid = b.starelid)
+where a.relkind in ('r','m')
+  and a.relname <> 'pg_statistic'
+  and (a.reltuples::numeric * b.rowsize) is not null
+  and a.reltuples > 0 and a.relpages > 1
+  and (a.relpages * 8192::bigint) > 5000000000
+  and ((a.relpages * 8192::bigint) / (a.reltuples::numeric * b.rowsize)) >= 2
+order by 4 desc;
+ 
+
+-- 5GB이상, 2배 이상 INDEX Bloating 조사 SQL
+select a.indrelid::regclass::text as t, a.indexrelid::regclass::text as i,
+(c.relpages * 8192::bigint) as asize, (b.reltuples::numeric * d.width) as esize,
+(c.relpages * 8192::bigint) / (b.reltuples::numeric * d.width) as bloating
+from pg_index a, pg_class b, pg_class c ,
+(select a.indrelid, a.indexrelid , (sum(b.stawidth) + 9) as width
+  from pg_index a, pg_statistic b
+  where a.indrelid = b.starelid and arraycontains(a.indkey, cast(b.staattnum::text as int2vector))
+  group by a.indrelid, a.indexrelid) d
+where a.indrelid = b.oid
+and a.indrelid = d.indrelid and a.indexrelid = d.indexrelid
+and c.relpages > 4
+and b.relkind in ('r','m')
+and a.indrelid = b.oid
+and a.indexrelid = c.oid
+and (c.relpages * 8192::bigint) > 5000000000
+and ((c.relpages * 8192::bigint) / (b.reltuples::numeric * d.width)) >= 2
+and (b.reltuples::numeric * d.width) > 0
+order by 5 desc;

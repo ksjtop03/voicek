@@ -1,0 +1,2 @@
+-- MySQL 테이블 스토리지 엔진 확인
+select engine from information_schema.TABLES where table_name = '테이블명' and table_schema = 'DB명';

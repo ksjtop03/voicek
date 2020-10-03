@@ -1,0 +1,556 @@
+■ 파일시스템 DISK FULL로 인한 DB다운 발생
+파일 시스템 장애 중 가장 많이 일어나는 장애는 아카이브 디렉터리에 공간이 없어 트랜잭션 로그를 아카이빙 하지 못하여 
+트랜잭션 로그 디렉터리의 공간이 차서 DB가 비정상적으로 종료되는 사례
+
+====================================================
+-- 아카이브 디렉토리 FULL 장애 복구
+====================================================
+-----------------------------------------------------------------------------------------------------------------------------------
+0. 발생 현상
+/archive 파티션 사용률이 100% 가 되면 아카이브 프로세스에 에러가 보이고, DB 로그에도 다음과 같은 에러가 출력 됨.
+o 프로세스 확인
+[enterprisedb@localhost ~]$ ps -ef | grep postgres
+500 27797 1 0 09:43 pts/0 00:00:00 /postgres/9.3AS/bin/edb-postgres
+500 27798 27797 0 09:43 ? 00:00:03 postgres: logger process
+500 27800 27797 0 09:43 ? 00:00:01 postgres: checkpointer process
+500 27801 27797 0 09:43 ? 00:00:01 postgres: writer process
+500 27802 27797 0 09:43 ? 00:00:00 postgres: wal writer process
+500 27803 27797 0 09:43 ? 00:00:00 postgres: autovacuum launcher process
+500 27804 27797 0 09:43 ? 00:00:00 postgres: archiver process failed on 000000010000000000000010
+o 에러 로그 확인
+cp: writing `/archive/temp/000000010000000000000010': No space left on device
+2013-09-04 10:34:11 KST @/ (27804) LOG: archive command failed with exit code 1
+2013-09-04 10:34:11 KST @/ (27804) DETAIL: The failed archive command was: \cp -f pg_xlog/000000010000000000000010 /archive/temp/000000010000000000000010 && \mv /archive/temp/000000010000000000000010 /archive/pgdata
+
+--> /archive 파티션 영역이 full 상태로 아카이빙 불가 상황
+-----------------------------------------------------------------------------------------------------------------------------------
+
+1. DB프로세스 정상 기동 확인
+[enterprisedb@localhost ~]$ ps -ef | grep postgres
+500 2988 1 0 15:40 ? 00:00:01 /postgres/9.3AS/bin/edb-postgres
+500 2989 2988 0 15:40 ? 00:00:00 postgres: logger process
+500 2991 2988 0 15:40 ? 00:00:00 postgres: checkpointer process
+500 2992 2988 0 15:40 ? 00:00:00 postgres: writer process
+500 2993 2988 0 15:40 ? 00:00:00 postgres: wal writer process
+500 2994 2988 0 15:40 ? 00:00:00 postgres: autovacuum launcher process
+500 2995 2988 0 15:40 ? 00:00:00 postgres: archiver process last was 000000010000000000000008
+500 2996 2988 0 15:40 ? 00:00:00 postgres: stats collector process
+500 4119 3132 0 15:54 pts/1 00:00:00 grep postgres
+
+-----------------------------------------------------------------------------------------------------------------------------------
+2. 현재 디스크 사용률 확인
+[enterprisedb@localhost ~]$ df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda8 5.5G 758M 4.5G 15% /
+tmpfs 499M 0 499M 0% /dev/shm
+/dev/sda3 2.0G 180M 1.7G 10% /archive
+/dev/sda1 485M 32M 429M 7% /boot
+/dev/sda2 4.0G 517M 3.3G 14% /data
+/dev/sda5 2.0G 196M 1.7G 11% /pg_xlog
+/dev/sda7 1008M 113M 845M 12% /postgres
+
+-----------------------------------------------------------------------------------------------------------------------------------
+3. /archive 파티션에서 dd 명령을 수행하여 임의로 disk full 상태 재현
+[enterprisedb@localhost archive]$ cd /archive/
+[enterprisedb@localhost archive]$ dd if=/dev/zero of=dummy.dat bs=1024b
+dd: writing `dummy.dat': No space left on device
+3417+0 records in
+3416+0 records out
+1791283200 bytes (1.8 GB) copied, 24.3351 s, 73.6 MB/s
+
+--> dd 결과 /archive 파티션이 full 상태 임을 확인
+-----------------------------------------------------------------------------------------------------------------------------------
+4. pgbench를 이용하여 트랜잭션을 발생, 아카이브 공간이 부족하여 /pg_xlog가 지속적으로 증가 함을 확인
+[enterprisedb@localhost ~]$ pgbench -i
+creating tables...
+10000 tuples done.
+20000 tuples done.
+30000 tuples done.
+40000 tuples done.
+50000 tuples done.
+60000 tuples done.
+70000 tuples done.
+80000 tuples done.
+90000 tuples done.
+100000 tuples done.
+set primary key...
+vacuum...done.
+-----------------------------------------------------------------------------------------------------------------------------------
+
+[enterprisedb@localhost ~]$ df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda8 5.5G 870M 4.3G 17% /
+tmpfs 499M 0 499M 0% /dev/shm
+/dev/sda3 2.0G 1.9G 16K 100% /archive
+/dev/sda1 485M 32M 429M 7% /boot
+/dev/sda2 4.0G 546M 3.3G 15% /data
+/dev/sda5 2.0G 1.8G 86M 96% /pg_xlog
+/dev/sda7 1008M 113M 845M 12% /postgres
+-----------------------------------------------------------------------------------------------------------------------------------
+5. /archive 파티션의 아카이빙 파일을 임시 공간으로 이동하여 /archive 공간 확보
+[enterprisedb@localhost pgdata]$ ll
+total 114688
+-rw-------. 1 enterprisedb enterprisedb 16777216 Sep 3 15:49 000000010000000000000002
+-rw-------. 1 enterprisedb enterprisedb 16777216 Sep 3 15:50 000000010000000000000003
+-rw-------. 1 enterprisedb enterprisedb 16777216 Sep 3 15:50 000000010000000000000004
+-rw-------. 1 enterprisedb enterprisedb 16777216 Sep 3 15:50 000000010000000000000005
+-rw-------. 1 enterprisedb enterprisedb 16777216 Sep 3 15:50 000000010000000000000006
+-rw-------. 1 enterprisedb enterprisedb 16777216 Sep 3 15:50 000000010000000000000007
+-rw-------. 1 enterprisedb enterprisedb 16777216 Sep 3 15:50 000000010000000000000008
+[enterprisedb@localhost pgdata]$ mv * /PAS_temp/
+[enterprisedb@localhost pgdata]$ ll
+total 0
+
+-----------------------------------------------------------------------------------------------------------------------------------
+6. /archive 파티션의 아카이빙 파일을 임시 공간으로 이동하여 /archive 공간 확보
+[enterprisedb@localhost archive]$ df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda8 5.5G 982M 4.2G 19% /
+tmpfs 499M 0 499M 0% /dev/shm
+/dev/sda3 2.0G 148M 1.8G 8% /archive
+/dev/sda1 485M 32M 429M 7% /boot
+/dev/sda2 4.0G 548M 3.3G 15% /data
+/dev/sda5 2.0G 1.9G 38M 99% /pg_xlog
+/dev/sda7 1008M 113M 845M 12% /postgres
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+7. archiver 프로세스 정상 작동 확인
+[enterprisedb@localhost archive_status]$ ps -ef | grep postgres
+500 27619 1 0 16:47 pts/0 00:00:03 /postgres/9.3AS/bin/edb-postgres
+500 27620 27619 0 16:47 ? 00:00:03 postgres: logger process
+500 27622 27619 0 16:47 ? 00:00:04 postgres: checkpointer process
+500 27623 27619 0 16:47 ? 00:00:01 postgres: writer process
+500 27624 27619 0 16:47 ? 00:00:01 postgres: wal writer process
+500 27625 27619 0 16:47 ? 00:00:01 postgres: autovacuum launcher process
+500 27626 27619 0 16:47 ? 00:00:03 postgres: archiver process last was 000000010000000000000014
+500 27627 27619 0 16:47 ? 00:00:03 postgres: stats collector process
+500 29384 27598 0 19:31 pts/0 00:00:00 grep postgres
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+====================================================
+-- xlog 디렉토리 FULL 장애 복구
+====================================================
+-----------------------------------------------------------------------------------------------------------------------------------
+0. 발생 현상
+DB 프로세스가 shutdown 되며 recovery mode가 됨
+o 프로세스 확인
+[enterprisedb@localhost ~]$ ps -ef | grep postgres
+500 19790 19765 0 16:01 pts/3 00:00:00 grep postgres
+[enterprisedb@localhost ~]$ pg_ctl status
+pg_ctl: no server running
+o 에러 로그 확인
+2013-09-05 15:38:56 KST enterprisedb@[local]/edb (6131) PANIC: could not write to file "pg_xlog/xlogtemp.6131": No space left on device
+2013-09-05 15:39:04 KST @/ (26151) LOG: server process (PID 6131) was terminated by signal 6: Aborted
+2013-09-05 15:39:04 KST @/ (26151) DETAIL: Failed process was running: END;
+2013-09-05 15:39:04 KST @/ (26151) LOG: terminating any other active server processes
+2013-09-05 15:39:04 KST enterprisedb@[local]/edb (8111) WARNING: terminating connection because of crash of another server process
+2013-09-05 15:39:04 KST enterprisedb@[local]/edb (8111) DETAIL: The postmaster has commanded this server process to roll back the current transaction and exit, because another server process exited abnormally and possibly corrupted shared memory.
+2013-09-05 15:39:04 KST enterprisedb@[local]/hjlee (8111) HINT: In a moment you should be able to reconnect to the database and repeat your command.
+2013-09-05 15:39:04 KST @/ (26151) LOG: archiver process (PID 26158) exited with exit code 1
+2013-09-05 15:39:04 KST @/ (26151) LOG: all server processes terminated; reinitializing
+2013-09-05 15:39:04 KST enterprisedb@[local]/edb (8137) FATAL: the database system is in recovery mode
+2013-09-05 15:39:04 KST @/ (8136) LOG: database system was interrupted; last known up at 2013-09-05 15:34:59 KST
+2013-09-05 15:39:04 KST enterprisedb@[local]/edb (8139) FATAL: the database system is in recovery mode
+-----------------------------------------------------------------------------------------------------------------------------------
+1. DB프로세스 정상 기동 확인
+[enterprisedb@localhost ~]$ ps -ef | grep postgres
+500 3390 1 0 10:06 pts/0 00:00:00 /postgres/9.3AS/bin/edb-postgres
+500 3391 3390 0 10:06 ? 00:00:00 postgres: logger process
+500 3393 3390 0 10:06 ? 00:00:00 postgres: checkpointer process
+500 3394 3390 0 10:06 ? 00:00:00 postgres: writer process
+500 3395 3390 0 10:06 ? 00:00:00 postgres: wal writer process
+500 3396 3390 0 10:06 ? 00:00:00 postgres: autovacuum launcher process
+500 3397 3390 0 10:06 ? 00:00:00 postgres: archiver process
+500 3398 3390 0 10:06 ? 00:00:00 postgres: stats collector process
+
+-----------------------------------------------------------------------------------------------------------------------------------
+2. 현재 디스크 사용률 확인
+[enterprisedb@localhost ~]$ df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda7 5.0G 4.7G 298M 95% /
+tmpfs 499M 0 499M 0% /dev/shm
+/dev/sda2 485M 11M 449M 3% /archive
+/dev/sda3 485M 45M 415M 10% /data
+/dev/sda1 1008M 66M 892M 7% /pg_xlog
+/dev/sda5 485M 86M 374M 19% /postgres
+
+-----------------------------------------------------------------------------------------------------------------------------------
+3. /archive 파티션에서 dd 명령을 수행하여 임의로 disk full 상태 재현
+[[enterprisedb@localhost ~]$ cd /archive/
+[enterprisedb@localhost archive]$ dd if=/dev/zero of=dummy.dat bs=1024b
+dd: writing `dummy.dat': No space left on device
+898+0 records in
+897+0 records out
+470700032 bytes (471 MB) copied, 1.98392 s, 237 MB/s
+
+--> dd 결과 /archive 파티션이 full 상태 임을 확인
+-----------------------------------------------------------------------------------------------------------------------------------
+4. /pg_xlog 파티션에 dd 명령을 수행하여 임의로 disk full 상태 재현
+[enterprisedb@localhost archive]$ cd /pg_xlog/
+[enterprisedb@localhost pg_xlog]$ dd if=/dev/zero of=dummy.dat bs=1024b
+dd: writing `dummy.dat': No space left on device
+1778+0 records in
+1777+0 records out
+931991552 bytes (932 MB) copied, 2.55807 s, 364 MB/s
+
+--> dd 결과 /pg_xlog 파티션이 full 상태 임을 확인
+
+-----------------------------------------------------------------------------------------------------------------------------------
+5. disk 사용량 확인
+[enterprisedb@localhost pg_xlog]$ df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda7 5.0G 4.7G 298M 95% /
+tmpfs 499M 0 499M 0% /dev/shm
+/dev/sda2 485M 460M 61K 100% /archive
+/dev/sda3 485M 45M 415M 10% /data
+/dev/sda1 1008M 955M 2.7M 100% /pg_xlog
+/dev/sda5 485M 86M 374M 19% /postgres
+
+-----------------------------------------------------------------------------------------------------------------------------------
+6. 미리 만들어진 트랜잭션 로그를 모두 쓰고 새로운 트랜잭션 로그를 만들 때 까지 부하를 발생
+6-1. 현재 트랜잭션 로그가 어디까지 쓰여 있는 지 확인
+[enterprisedb@localhost pg_xlog]$ cd ./pgdata/
+[enterprisedb@localhost pgdata]$ ll
+total 32772
+-rw------- 1 enterprisedb enterprisedb 16777216 Sep 6 10:11 000000010000000000000002
+-rw------- 1 enterprisedb enterprisedb 16777216 Sep 6 09:56 000000010000000000000003
+drwx------ 2 enterprisedb enterprisedb 4096 Sep 6 09:56 archive_status
+
+-----------------------------------------------------------------------------------------------------------------------------------
+6-2. 부하 발생
+[enterprisedb@localhost pgdata]$ pgbench -i
+NOTICE: table "pgbench_branches" does not exist, skipping
+NOTICE: table "pgbench_tellers" does not exist, skipping
+NOTICE: table "pgbench_accounts" does not exist, skipping
+NOTICE: table "pgbench_history" does not exist, skipping
+creating tables...
+10000 tuples done.
+20000 tuples done.
+30000 tuples done.
+40000 tuples done.
+50000 tuples done.
+60000 tuples done.
+70000 tuples done.
+80000 tuples done.
+90000 tuples done.
+100000 tuples done.
+set primary key...
+vacuum...done.
+[enterprisedb@localhost pgdata]$ pgbench -c 50 -t 1000
+starting vacuum...end.
+6-3. 미리 만들어진 트랜잭션 사용 완료
+[enterprisedb@localhost pgdata]$ ll
+total 32772
+-rw------- 1 enterprisedb enterprisedb 16777216 Sep 6 10:17 000000010000000000000002
+-rw------- 1 enterprisedb enterprisedb 16777216 Sep 6 10:18 000000010000000000000003
+drwx------ 2 enterprisedb enterprisedb 4096 Sep 6 10:18 archive_status
+
+-----------------------------------------------------------------------------------------------------------------------------------
+7. 트랜잭션의 공간이 없어서 서버가 shutdown 됨
+[enterprisedb@localhost ~]$ pg_ctl status
+pg_ctl: no server running
+-----------------------------------------------------------------------------------------------------------------------------------
+8. 복구 작업
+8-1. 손실 없는 복구
+1) /archive 파티션의 공간 확보
+2) /pg_xlog 파티션의 공간 확보
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-1)-1. 상태 확인
+[enterprisedb@localhost ~]$ ll /pg_xlog/pgdata/archive_status
+total 0
+-rw------- 1 enterprisedb enterprisedb 0 Sep 6 10:17 000000010000000000000002.ready
+-rw------- 1 enterprisedb enterprisedb 0 Sep 6 10:18 000000010000000000000003.ready
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-1)-2. 임시 공간에 xlog 파일을 옮김 (여기 실습에서는 /tmp/pg_xlog)
+[enterprisedb@localhost ~]$ mv /pg_xlog/pgdata /tmp/pg_xlog
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-1)-3. 확인
+[enterprisedb@localhost ~]$ ll /tmp/pg_xlog/pgdata/
+total 32772
+-rw------- 1 enterprisedb enterprisedb 16777216 Sep 6 10:17 000000010000000000000002
+-rw------- 1 enterprisedb enterprisedb 16777216 Sep 6 10:18 000000010000000000000003
+drwx------ 2 enterprisedb enterprisedb 4096 Sep 6 10:18 archive_status
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-1)-4. 클러스터 내의 pg_xlog 심볼릭 링크 재생성
+[enterprisedb@localhost ~]$ ls –l /data/pgdata/pg_xlog
+lrwxrwxrwx 1 enterprisedb enterprisedb 15 Sep 6 10:03 pg_xlog -> /pg_xlog/pgdata
+[enterprisedb@localhost ~]$ rm /data/pgdata/pg_xlog
+[enterprisedb@localhost ~]$ ln -s /tmp/pg_xlog/pgdata/ /data/pgdata/pg_xlog
+[enterprisedb@localhost ~]$ ls –l /data/pgdata/pg_xlog
+lrwxrwxrwx 1 enterprisedb enterprisedb 20 Sep 6 10:40 pg_xlog -> /tmp/pg_xlog/pgdata/
+
+확인
+삭제
+재생성
+-----------------------------------------------------------------------------------------------------------------------------------
+8-1)-5. 서버 기동
+[enterprisedb@localhost ~]$ pg_ctl start
+server starting
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-1)-6. 상태 확인
+o 프로세스 확인
+[enterprisedb@localhost ~]$ ps -ef | grep postgres
+500 10319 1 0 10:43 pts/4 00:00:00 /postgres/9.3AS/bin/edb-postgres
+500 10320 10319 0 10:43 ? 00:00:00 postgres: logger process
+500 10322 10319 0 10:43 ? 00:00:00 postgres: checkpointer process
+500 10323 10319 0 10:43 ? 00:00:00 postgres: writer process
+500 10324 10319 0 10:43 ? 00:00:00 postgres: wal writer process
+500 10325 10319 0 10:43 ? 00:00:00 postgres: autovacuum launcher process
+500 10326 10319 0 10:43 ? 00:00:00 postgres: archiver process last was 000000010000000000000003
+500 10327 10319 0 10:43 ? 00:00:00 postgres: stats collector process
+500 10336 10205 0 10:44 pts/4 00:00:00 grep postgres
+
+o /pg_xlog 디렉토리 확인
+[enterprisedb@localhost archive]$ ll /tmp/pg_xlog/pgdata/archive_status
+total 0
+-rw------- 1 enterprisedb enterprisedb 0 Sep 6 10:17 000000010000000000000002.done
+-rw------- 1 enterprisedb enterprisedb 0 Sep 6 10:43 000000010000000000000003.done
+o alert 로그 확인
+2013-09-06 10:43:52 KST @/ (10321) LOG: redo starts at 0/20D1B88
+2013-09-06 10:43:53 KST @/ (10321) LOG: could not open file "pg_xlog/000000010000000000000004" (log file 0, segment 4): No such file or directory
+2013-09-06 10:43:53 KST @/ (10321) LOG: redo done at 0/3FFFF90
+2013-09-06 10:43:53 KST @/ (10321) LOG: last completed transaction was at log time 2013-09-06 10:18:20.474975+09
+2013-09-06 10:43:54 KST @/ (10319) LOG: database system is ready to accept connections
+2013-09-06 10:43:54 KST @/ (10325) LOG: autovacuum launcher started
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-2. 손실을 감안한 복구
+8-2)-1. /pg_xlog와 /archive 의 모든 트랜잭션 로그 삭제
+[enterprisedb@localhost ~]$ rm -rf /archive/pgdata/* /archive/temp/* /pg_xlog/pgdata/00* /pg_xlog/pgdata/archive_status/*
+트랜잭션
+
+--> 트랜잭션 로그를 모두 삭제하여 disk 공간을 확보 후 서버 기동 (base 백업 만큼만 복구함)
+-----------------------------------------------------------------------------------------------------------------------------------
+8-2)-2. 트랜잭션 로그 초기화
+[enterprisedb@localhost ~]$ pg_controldata
+-- 상략
+Latest checkpoint location: 0/20D1B28
+Prior checkpoint location: 0/20D1B28
+Latest checkpoint's REDO location: 0/20D1B28
+
+--> 현재 트랜잭션 로그 확인
+-----------------------------------------------------------------------------------------------------------------------------------
+8-2)-3. 트랜잭션 로그 초기화
+[enterprisedb@localhost ~]$ pg_resetxlog -f /data/pgdata
+Transaction log reset
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-2)-4. 변경 확인
+[enterprisedb@localhost ~]$ pg_controldata
+-- 상략
+Latest checkpoint location: 0/3000020
+Prior checkpoint location: 0/0
+Latest checkpoint's REDO location: 0/3000020
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-2)-5. 서버 기동
+[enterprisedb@localhost ~]$ pg_ctl start
+server starting
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8-2)-6. 상태 확인
+o 프로세스 확인
+[enterprisedb@localhost ~]$ ps -ef | grep postgres
+500 10248 1 0 10:37 pts/4 00:00:00 /postgres/9.3AS/bin/edb-postgres
+500 10249 10248 0 10:37 ? 00:00:00 postgres: logger process
+500 10251 10248 0 10:37 ? 00:00:00 postgres: checkpointer process
+500 10252 10248 0 10:37 ? 00:00:00 postgres: writer process
+500 10253 10248 0 10:37 ? 00:00:00 postgres: wal writer process
+500 10254 10248 0 10:37 ? 00:00:00 postgres: autovacuum launcher process
+500 10255 10248 0 10:37 ? 00:00:00 postgres: archiver process
+500 10256 10248 0 10:37 ? 00:00:00 postgres: stats collector process
+o /pg_xlog 디렉토리 확인
+[enterprisedb@localhost ~]$ ll /pg_xlog/pgdata/
+total 16388
+-rw------- 1 enterprisedb enterprisedb 16777216 Sep 6 10:33 000000010000000000000003
+drwx------ 2 enterprisedb enterprisedb 4096 Sep 6 10:32 archive_status
+
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+====================================================
+-- 데이터 디렉토리 FULL 장애 복구
+====================================================
+-----------------------------------------------------------------------------------------------------------------------------------
+0. 발생 현상
+o alert log 확인
+2013-10-04 18:14:11 KST enterprisedb@[local]/edb (3741) HINT: Check free disk space.
+2013-10-04 18:14:11 KST enterprisedb@[local]/edb (3741) STATEMENT: insert into test select * from test;
+2013-10-04 18:14:11 KST enterprisedb@[local]/edb (3744) ERROR: could not extend file "base/14083/16648": No space left on device
+2013-10-04 18:14:11 KST enterprisedb@[local]/edb (3744) HINT: Check free disk space.
+2013-10-04 18:14:11 KST en2013-10-04 18:15:38 KST @/ (3186) LOG: could not write temporary statistics file "pg_stat_tmp/pgstat.tmp": No space left on device
+2013-10-04 18:15:39 KST @/ (3186) LOG: could not write temporary statistics file "pg_stat_tmp/pgstat.tmp": No space left on device
+
+--> 데이터베이스의 데이터 사용량이 많아 /data의 파티션 영역이 사용량이 100%되어 더 이상 데이터를 수정/저장할 수 없게 됨
+-----------------------------------------------------------------------------------------------------------------------------------
+1. DB프로세스 정상 기동 확인
+[enterprisedb@localhost ~]$ ps -ef | grep postgres
+500 3200 1 0 17:37 pts/2 00:00:00 /postgres/9.3AS/bin/edb-postgres
+500 3201 3200 0 17:37 ? 00:00:00 postgres: logger process
+500 3203 3200 0 17:37 ? 00:00:00 postgres: checkpointer process
+500 3204 3200 0 17:37 ? 00:00:00 postgres: writer process
+500 3205 3200 0 17:37 ? 00:00:00 postgres: wal writer process
+500 3206 3200 0 17:37 ? 00:00:00 postgres: autovacuum launcher process
+500 3207 3200 0 17:37 ? 00:00:00 postgres: archiver process
+500 3208 3200 0 17:37 ? 00:00:00 postgres: stats collector process
+
+-----------------------------------------------------------------------------------------------------------------------------------
+2. 현재 데이터 베이스의 테이블 스페이스 확인 및 디스크 사용률 확인
+edb=# SELECT spcname, pg_get_userbyid(spcowner) AS owner, CASE WHEN length(pg_tablespace_location(oid)) = 0 THEN (SELECT setting FROM pg_settings WHERE name='data_directory') ELSE pg_tablespace_location(oid) END AS spclocation, spcacl, pg_tablespace_location(oid) as spcoptions , pg_size_pretty(pg_tablespace_size(spcname)) AS size FROM pg_tablespace ORDER BY spcname;
+spcname | owner | spclocation | spcacl | spcoptions | size
+------------+--------------+--------------+--------+------------+--------
+pg_default | enterprisedb | /data/pgdata | | | 35 MB
+pg_global | enterprisedb | /data/pgdata | | | 437 kB
+
+--> 테이블 스페이스 확인
+-----------------------------------------------------------------------------------------------------------------------------------
+[enterprisedb@localhost ~]$ df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda6 13G 4.9G 7.6G 40% /
+tmpfs 499M 0 499M 0% /dev/shm
+/dev/sda2 2.0G 100M 1.8G 6% /archive
+/dev/sda1 3.0G 104M 2.8G 4% /data
+/dev/sda3 2.0G 116M 1.8G 7% /pg_xlog
+
+--> 디스크 사용량 확인
+-----------------------------------------------------------------------------------------------------------------------------------
+3. /data 파티션에 dd 명령어를 수행하여 임의로 disk full 상태 재현
+[enterprisedb@localhost ~]$ cd /data/
+[enterprisedb@localhost data]$ dd if=/dev/zero of=dummy.dat bs=1024b
+dd: writing `dummy.dat': No space left on device
+5517+0 records in
+5516+0 records out
+2892247040 bytes (2.9 GB) copied, 18.0745 s, 160 MB/s
+
+--> dd 결과 /data 파티션이 full 상태 임을 확인
+-----------------------------------------------------------------------------------------------------------------------------------
+4. disk 사용량 확인
+[enterprisedb@localhost data]$ df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda6 13G 4.9G 7.6G 40% /
+tmpfs 499M 0 499M 0% /dev/shm
+/dev/sda2 2.0G 100M 1.8G 6% /archive
+/dev/sda1 3.0G 2.8G 8.2M 100% /data
+/dev/sda3 2.0G 116M 1.8G 7% /pg_xlog
+
+-----------------------------------------------------------------------------------------------------------------------------------
+5. 테스트 테이블 생성
+edb=# \dt
+List of relations
+Schema | Name | Type | Owner
+--------+---------------------------+-------+--------------
+public | dept | table | enterprisedb
+public | emp | table | enterprisedb
+public | jobhist | table | enterprisedb
+
+-----------------------------------------------------------------------------------------------------------------------------------
+edb=# create table test as select * from emp limit 0;
+SELECT 0
+
+--> 테스트 테이블 생성
+-----------------------------------------------------------------------------------------------------------------------------------
+6. 샘플 스키마를 이용하여 데이터 양을 임의로 증가
+[enterprisedb@localhost ~]$ while true; do psql -c "insert into test select * from emp limit 1;" edb; usleep 10000; done;
+INSERT 0 1
+INSERT 0 1
+.....
+enterprisedb@localhost ~]$ while true; do psql -c "insert into test select * from test;" edb; usleep 10000; done;
+INSERT 0 812
+INSERT 0 1624
+INSERT 0 3248
+INSERT 0 6496
+INSERT 0 12992
+INSERT 0 25984
+INSERT 0 51968
+ERROR: could not extend file "base/14083/16648": No space left on device
+HINT: Check free disk space.
+
+--> /data 마운트가 full 날 때까지 test 테이블에 데이터 insert
+-----------------------------------------------------------------------------------------------------------------------------------
+7. 상태 확인
+o 디스크 사용량
+[enterprisedb@localhost ~]$ df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda6 13G 4.9G 7.6G 40% /
+tmpfs 499M 0 499M 0% /dev/shm
+/dev/sda2 2.0G 100M 1.8G 6% /archive
+/dev/sda1 3.0G 2.9G 4.0K 100% /data
+/dev/sda3 2.0G 116M 1.8G 7% /pg_xlog
+
+-----------------------------------------------------------------------------------------------------------------------------------
+o 프로세스 확인
+[enterprisedb@localhost ~]$ ps -ef | grep postgres
+500 3200 1 0 17:37 ? 00:00:01 /postgres/9.3AS/bin/edb-postgres
+500 3201 3200 0 17:37 ? 00:00:00 postgres: logger process
+500 3203 3200 0 17:37 ? 00:00:00 postgres: checkpointer process
+500 3204 3200 0 17:37 ? 00:00:00 postgres: writer process
+500 3205 3200 0 17:37 ? 00:00:00 postgres: wal writer process
+500 3206 3200 0 17:37 ? 00:00:00 postgres: autovacuum launcher process
+500 3207 3200 0 17:37 ? 00:00:00 postgres: archiver process
+500 3208 3200 0 17:37 ? 00:00:01 postgres: stats collector process
+500 11265 3200 0 17:46 ? 00:00:00 postgres: autovacuum worker process edb
+o alert log 확인
+[enterprisedb@localhost ~]$ cd /data/pgdata/pg_log/
+[enterprisedb@localhost pg_log]$ ll
+total 40
+-rw-------. 1 enterprisedb enterprisedb 20480 Oct 4 17:48 enterprisedb-2013-10-04_173715.log
+-rw-------. 1 enterprisedb enterprisedb 4486 Oct 4 17:35 startup.log
+[enterprisedb@localhost pg_log]$ vi enterprisedb-2013-10-04_173715.log
+2013-10-04 17:41:37 KST enterprisedb@[local]/edb (7788) HINT: Check free disk space.
+2013-10-04 17:41:37 KST enterprisedb@[local]/edb (7788) STATEMENT: insert into test select * from test;
+2013-10-04 17:41:37 KST enterprisedb@[local]/edb (7791) ERROR: could not extend file "base/14083/16645": No space left 2013-10-04 17:41:46 KST @/ (3208) LOG: could not write temporary statistics file "pg_stat_tmp/pgstat.tmp": No space left on device
+2013-10-04 17:41:46 KST @/ (3208) LOG: could not write temporary statistics file "pg_stat_tmp/pgstat.tmp": No space left on device
+o 트랜잭션 확인
+[enterprisedb@localhost ~]$ psql
+psql (9.2.4.8)
+Type "help" for help.
+edb=# select * from test limit 1;
+empno | ename | job | mgr | hiredate | sal | comm | deptno
+-------+-------+-------+------+--------------------+--------+------+--------
+7369 | SMITH | CLERK | 7902 | 17-DEC-80 00:00:00 | 800.00 | | 20
+
+--> 프로세스는 정상이나, autovacuum worker process가 자동 실행 됨
+--> 새로운 세션은 접근가능하고 select, delete 작업은 가능하나 insert, update 작업은 되지 않음
+-----------------------------------------------------------------------------------------------------------------------------------
+edb=# insert into test values (1,'kt','manager',7902,now(),900,null,20);
+ERROR: could not extend file "base/14083/16645": No space left on device
+HINT: Check free disk space.
+edb=# update test set empno = 1;
+ERROR: could not extend file "base/14083/16645": No space left on device
+HINT: Check free disk space.
+edb=# delete from test;
+DELETE 80822
+
+-----------------------------------------------------------------------------------------------------------------------------------
+8. 테이블 스페이스 이동을 위해 서버 shutdown
+[enterprisedb@localhost ~]$ pg_ctl -mf stop
+waiting for server to shut down............ done
+server stopped
+
+-----------------------------------------------------------------------------------------------------------------------------------
+9. 테이블 스페이스를 이동하여 복구
+[enterprisedb@localhost ~]$ mv /data/pgdata /data2/pgdata
+[enterprisedb@localhost ~]$ cd /data2/pgdata/
+[enterprisedb@localhost pgdata]$ ls
+base global pg_ident.conf pg_notify pg_stat_tmp pg_twophase postgresql.conf
+dbms_pipe pg_clog pg_log pg_serial pg_subtrans PG_VERSION postgresql.conf.bk
+dummy.dat pg_hba.conf pg_multixact pg_snapshots pg_tblspc pg_xlog postmaster.opts
+
+-----------------------------------------------------------------------------------------------------------------------------------
+10. DB 재시작
+[enterprisedb@localhost pgdata]$ pg_ctl -D /data2/pgdata start
+server starting
+[enterprisedb@localhost pgdata]$ psql
+psql (9.2.4.8)
+Type "help" for help.
+edb=# insert into test values (1,'kt','manager',7902,now(),900,null,20);
+INSERT 0 1
+
+-----------------------------------------------------------------------------------------------------------------------------------

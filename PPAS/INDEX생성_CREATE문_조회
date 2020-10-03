@@ -1,0 +1,5 @@
+/* ----------------------------------------------------------------------------------------------------
+                                         INDEX 생성 CREATE 문 조회
+---------------------------------------------------------------------------------------------------- */
+
+select schemaname , tablename , indexname , indexdef from pg_indexes where schemaname = 'iotown' and tablename like 'rat_txn_hmctnb%' order by 1,2 ,3;

@@ -1,0 +1,1270 @@
+■ DUMP
+
+**데이터베이스 dump --> 데이터베이스 drop --> 데이터베이스 생성 --> 데이터베이스 복원
+
+테스트 결과, 1번 3번의 dump파일 사이즈는 동일
+
+-------------------------------------
+1. 압축하여 dump 하기
+-------------------------------------
+
+-- 데이터베이스 사이즈 조회
+
+     이름      |    소유주    |  인코딩   | Collate | Ctype | ICU |          액세스 권한          |  크기   | 테이블스페이스 |                    설명
+ wavdb         | wavdb        | UTF8      | C       | C     |     |                               | 4528 MB | pg_default     |
+
+*데이터베이스 : wavdb
+*사이즈 : 4528 MB
+ 
+-- 압축 덤프
+pg_dump wavdb | gzip > wavdb.gz
+ 
+ 
+-- reload (방법 2가지)
+1) gunzip -c wavdb.gz | psql wavdb
+2) cat wavdb.gz | gunzip | psql wavdb
+
+
+[enterprisedb@TI-PLATFORM-PPAS01 /data/DBA/work/ksj]$ du -hs wavdb.gz
+211M    wavdb.gz
+
+*4528 MB -> 211 MB ( 사이즈 약 21배 줄음 )
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+-------------------------------------
+2. split(분할) 옵션을 이용한 dump 
+-------------------------------------
+
+- 명령어 : pg_dump DB명 | split -b 분할크기(m) - 파일명
+
+
+1) 분할 dump
+pg_dump wavdb | split -b 100m - wavdb.sql
+
+
+2) dump파일 reload 결과
+[enterprisedb@TI-PLATFORM-PPAS01 /data/DBA/work/ksj]$ cat wavdb* | psql wavdb
+
+SET
+SET
+SET
+SET
+SET
+SET
+SET
+SET
+SET
+SET
+CREATE SCHEMA
+ALTER SCHEMA
+CREATE SCHEMA
+ALTER SCHEMA
+CREATE SCHEMA
+ALTER SCHEMA
+CREATE EXTENSION
+COMMENT
+CREATE EXTENSION
+COMMENT
+CREATE EXTENSION
+COMMENT
+SET
+CREATE FUNCTION
+ALTER FUNCTION
+SET
+CREATE FUNCTION
+ALTER FUNCTION
+SET
+SET
+SET
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+SET
+CREATE VIEW
+ALTER TABLE
+CREATE VIEW
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+SET
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+SET
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+SET
+COPY 0
+SET
+ setval
+--------
+      1
+(1개 행)
+
+COPY 0
+COPY 5
+SET
+COPY 0
+COPY 0
+COPY 808587
+COPY 1457534
+COPY 0
+COPY 3868
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 36320
+COPY 0
+COPY 0
+COPY 0
+ setval
+--------
+      1
+(1개 행)
+
+ setval
+--------
+    280
+(1개 행)
+
+ setval
+--------
+    280
+(1개 행)
+
+ setval
+--------
+   2096
+(1개 행)
+
+ setval
+--------
+      1
+(1개 행)
+
+COPY 0
+COPY 21
+COPY 79
+COPY 3858
+COPY 43
+COPY 16
+COPY 34
+COPY 106
+COPY 51322
+COPY 13255
+COPY 1266
+COPY 0
+COPY 73973
+COPY 0
+COPY 0
+COPY 0
+COPY 5223
+COPY 5223
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 803
+COPY 2
+COPY 9
+COPY 741
+COPY 48
+COPY 0
+COPY 132
+COPY 0
+COPY 8
+COPY 25
+COPY 9
+COPY 5868906
+COPY 12
+COPY 40
+COPY 5
+COPY 2
+COPY 0
+COPY 192
+SET
+COPY 0
+COPY 0
+COPY 808582
+COPY 1457534
+COPY 0
+COPY 3868
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 36320
+COPY 0
+COPY 0
+COPY 0
+ setval
+--------
+      1
+(1개 행)
+
+ setval
+--------
+    280
+(1개 행)
+
+ setval
+--------
+    280
+(1개 행)
+
+ setval
+--------
+   2096
+(1개 행)
+
+ setval
+--------
+      1
+(1개 행)
+
+COPY 21
+COPY 79
+COPY 3858
+COPY 43
+COPY 16
+COPY 34
+COPY 106
+COPY 51322
+COPY 13255
+COPY 1266
+COPY 0
+COPY 73973
+COPY 0
+COPY 0
+COPY 0
+COPY 5223
+COPY 5223
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 5895838
+COPY 803
+COPY 2
+COPY 9
+COPY 741
+COPY 48
+COPY 0
+COPY 132
+COPY 0
+COPY 8
+COPY 25
+COPY 9
+COPY 5868906
+COPY 12
+COPY 40
+COPY 5
+COPY 2
+COPY 0
+COPY 192
+SET
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+SET
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+SET
+CREATE INDEX
+SET
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+
+
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+SET
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+
+
+
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+
+
+
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+SET
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+SET
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+GRANT
+GRANT
+GRANT
+GRANT
+SET
+GRANT
+SET
+GRANT
+SET
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+SET
+GRANT
+SET
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+
+[enterprisedb@TI-PLATFORM-PPAS01 /data/DBA/work/ksj]$ psql -h /tmp
+psql.bin (9.6.5.10)
+도움말을 보려면 "help"를 입력하십시오.
+
+edb=# \l+
+                                                                            데이터베이스 목록
+     이름      |    소유주    |  인코딩   | Collate | Ctype | ICU |          액세스 권한          |  크기   | 테이블스페이스 |                    설명
+---------------+--------------+-----------+---------+-------+-----+-------------------------------+---------+----------------+--------------------------------------------
+ bylee_test    | enterprisedb | UTF8      | C       | C     |     |                               | 11 MB   | pg_default     |
+ dblink_source | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ dblink_target | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ edb           | enterprisedb | SQL_ASCII | C       | C     |     |                               | 38 MB   | pg_default     |
+ familybox     | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ ichat_prd_db  | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ iotdb         | enterprisedb | SQL_ASCII | C       | C     |     |                               | 15 MB   | pg_default     |
+ iotdb_test    | enterprisedb | SQL_ASCII | C       | C     |     |                               | 13 MB   | pg_default     |
+ kmap          | enterprisedb | SQL_ASCII | C       | C     |     | =Tc/enterprisedb             +| 11 MB   | pg_default     |
+               |              |           |         |       |     | enterprisedb=CTc/enterprisedb+|         |                |
+               |              |           |         |       |     | ilogcenter=c/enterprisedb     |         |                |
+ ld            | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ ld2           | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ mpay          | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ nmimo         | enterprisedb | SQL_ASCII | C       | C     |     |                               | 4387 MB | pg_default     |
+ olpro         | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ pcpndb        | enterprisedb | UTF8      | C       | C     |     |                               | 12 MB   | pg_default     |
+ pevpdb        | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ plany         | enterprisedb | SQL_ASCII | C       | C     |     | =Tc/enterprisedb             +| 11 MB   | pg_default     |
+               |              |           |         |       |     | enterprisedb=CTc/enterprisedb+|         |                |
+               |              |           |         |       |     | lc_user=c/enterprisedb       +|         |                |
+               |              |           |         |       |     | h911=c/enterprisedb           |         |                |
+ pns           | postgres     | UTF8      | C       | C     |     |                               | 12 MB   | pg_default     |
+ pns_tago      | postgres     | UTF8      | C       | C     |     |                               | 2144 MB | pg_default     |
+ postgres      | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     | default administrative connection database
+ preorder      | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ prod_cpsc_api | enterprisedb | SQL_ASCII | C       | C     |     |                               | 12 MB   | pg_default     |
+ sjdb          | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ tbuid         | enterprisedb | SQL_ASCII | C       | C     |     |                               | 13 MB   | pg_default     |
+ template0     | enterprisedb | SQL_ASCII | C       | C     |     | =c/enterprisedb              +| 11 MB   | pg_default     | unmodifiable empty database
+               |              |           |         |       |     | enterprisedb=CTc/enterprisedb |         |                |
+ template1     | enterprisedb | SQL_ASCII | C       | C     |     | =c/enterprisedb              +| 11 MB   | pg_default     | default template for new databases
+               |              |           |         |       |     | enterprisedb=CTc/enterprisedb |         |                |
+ test          | enterprisedb | UTF8      | C       | C     |     |                               | 3418 MB | pg_default     |
+ test2         | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+ testdb        | test2        | UTF8      | C       | C     |     |                               | 11 MB   | pg_default     |
+ tocdb         | postgres     | UTF8      | C       | C     |     |                               | 11 MB   | pg_default     |
+ wavdb         | wavdb        | UTF8      | C       | C     |     |                               | 4528 MB | pg_default     |
+(31개 행)
+
+
+-------------------------------------
+3. pg_dump의 커스텀 덤프 형식 사용
+-------------------------------------
+
+pg_dump의 커스텀 덤프 형식 사용. 설치된 zlib 압축 라이브러리를 사용하여 PostgreSQL을 시스템에서 빌드한 경우 출력 파일에 쓸 때 커스텀 덤프 형식이 데이터를 압축한다.
+이렇게 하면 덤프 파일 크기가 gzip을 사용한 것과 비슷하지만 테이블을 선택적으로 복원할 수 있다는 장점이 있다.
+
+장점 : 바이너리형태로 백업을 받기 때문에 2번의 텍스트형식의 dump보다 파일 사이즈가 상대적으로 훨씬 줄어든다
+단점 : 2번의 텍스트 형식 dump의 경우 수정 및 확인이 가능하나, 바이너리형태의 dump의 경우 수정
+
+■ dump 명령어 : pg_dump -Fc dbname > filename
+ex) pg_dump -Fc wavdb > wavdb.sql
+
+■ 복원 명령어 : pg_restore -d dbname filename
+ex) pg_restore -d wavdb wavdb.sql
+
+*커스텀 형식 덤프는 psql용 스크립트는 아니지만, 대신 pg_restore를 사용하여 복원해야 한다. 
+
+
+일반 옵션들:
+-F, --format=c|d|t|p         출력 파일 형식(사용자 지정, 디렉터리, tar, 일반 텍스트(초기값))
+
+

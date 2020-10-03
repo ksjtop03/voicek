@@ -1,0 +1,2 @@
+# 인덱스 조회
+SHOW INDEX FROM 테이블명;

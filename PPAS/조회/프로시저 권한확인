@@ -1,0 +1,3 @@
+select grantor, grantee , specific_schema, specific_name, routine_schema , routine_name , privilege_type from information_schema.routine_privileges  ;
+
+select * from dba_objects where object_name = '';

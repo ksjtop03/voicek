@@ -1,0 +1,91 @@
+■ DUMP 정리
+
+-------------------------------------------------
+                 1. 압축 덤프 사용
+-------------------------------------------------
+
+1) 압축 덤프
+
+- 명령어
+pg_dump DATABASE명 | gzip > 압축파일명.gz
+ex) pg_dump wavdb | gzip > wavdb.gz
+
+
+2) reload ( reload 하기 전 반드시 복원하려는 database가 존재하여야 한다. 없을 시 database 생성필요 )
+
+- 명령어 (2가지 방법)
+gunzip -c 압축파일명.gz | psql DATABASE명
+ex) gunzip -c wavdb.gz | psql wavdb
+
+cat 압축파일명.gz | gunzip | psql DATABASE명
+ex) cat wavdb.gz | gunzip | psql wavdb
+		   
+		   
+■ 장점
+-데이터베이스 사이즈가 클 경우, 해당 압축 덤프를 이용하여 dump를 하면 상당한 압축효과를 볼 수 있다.
+ex) 테스트 결과, DB사이즈 4528 MB 를 해당 압축 덤프를 이용하여 dump한 결과 211 MB로 약 1/21 정도 줄어듦
+
+-dump 파일사이즈도 상당히 줄일 수 있으며, 압축해제(명령어 : gzip -d 파일명 ) 시 텍스트 형식(plain text)으로 확인도 가능함. ( 1번,3번 덤프 단점을 보완 )
+
+■ 단점 
+...
+
+-------------------------------------------------
+     2. 텍스트 형식 덤프 사용 ( *옵션 : -Fp )
+-------------------------------------------------
+
+1) 텍스트 형식 덤프 ( 일반적인 덤프 방식 )
+
+- 명령어
+pg_dump -Fp -f 덤프파일명.sql -d DATABASE명
+ex) pg_dump -Fp -f /data/DBA/work/wavdb.sql -d wavdb
+
+
+2) reload ( reload 하기 전 반드시 복원하려는 database가 존재하여야 한다. 없을 시 database 생성필요 )
+-- 아래 2가지 방법으로 복원가능
+
+방법1)
+DB 접속 후 database로 이동 후 dump sql파일 수행
+ex) psql -h /tmp -->  \c wavdb   -->  \i wavdb.sql
+
+방법2)
+psql -f dump파일명 DATABASE명
+ex) psql -f wavdb.sql wavdb
+
+■ 장점 
+-일반 텍스트 형식(plain text) 으로 dump를 받기 때문에 육안으로 확인가능하여 전체 데이터베이스 구조파악이 가능
+-수정가능
+
+■ 단점
+1번의 압축 덤프 혹은 3번의 커스텀 덤프보다 dump 파일 사이즈가 크다
+dump결과 기존 4528 MB --> 2 GB로 약 1/2 정도 줄어듦
+
+
+
+-------------------------------------------------
+ 3. pg_dump 커스텀 덤프 형식 사용 ( *옵션 : -Fc )
+-------------------------------------------------
+
+1) pg_dump 커스텀 덤프
+
+- 명령어
+pg_dump -Fc DB명 > 파일명
+ex) pg_dump -Fc DB명 > 파일명
+
+2) reload  ( reload 하기 전 반드시 복원하려는 database가 존재하여야 한다. 없을 시 database 생성필요 )
+
+pg_restore -d DATABASE명 파일명
+ex) pg_restore -d wavdb wavdb.sql
+
+** 주의) 커스텀 덤프 형식의 경우, 반드시 pg_restore 명령을 이용하여 복원해야 한다.!!!
+
+■ 장점 
+데이터베이스 사이즈가 클 경우, 해당 압축 덤프를 이용하여 dump를 하면 상당한 압축효과를 볼 수 있다.
+ex) 테스트 결과, DB사이즈 4528 MB 를 해당 압축 덤프를 이용하여 dump한 결과 211 MB로 약 1/21 정도 줄어듦 (1번과 동일)
+
+■ 단점
+-dump파일이 일반 텍스트 형식이 아닌 바이너리 형식으로 육안확인 불가
+-dump 시간 오래걸림
+-수정불가
+
+

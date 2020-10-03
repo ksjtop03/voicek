@@ -1,0 +1,128 @@
+■ 데이터베이스 생성 
+
+-- 문법
+CREATE DATABASE name
+[ [ WITH ] [ OWNER [=] user_name ]
+[ TEMPLATE [=] template ]
+[ ENCODING [=] encoding ]
+[ LC_COLLATE [=] lc_collate ]
+[ LC_CTYPE [=] lc_ctype ]
+[ TABLESPACE [=] tablespace_name ]
+[ CONNECTION LIMIT [=] connlimit ] ]
+
+*주의)
+PPAS/PostgreSQL의 경우 TABLESPACE 사용을 권장하지 않음. ( 하여 해당 옵션은 불필요 )
+
+*옵션설명)
+- OWNER : 소유주로 지정할 유저명
+
+- TEMPLATE : 데이터베이스 생성 시 제공되는 템플릿 2가지 (template0, template1) 를 이용하여 생성
+   *template0 : locale 관련된 설정이 초기화돼있지 않은 데이터베이스
+   *template1 : locale 관련된 설정이 이미 초기화돼있는 데이터베이스 ( *default 값 )
+  --> 부가적인 설명은 아래 #별첨_1 내용 참고
+
+- CONNECTION LIMIT : 데이터베이스에 동시접속을 몇 개까지 가능하게 할 것인지를 설정하는 옵션  ( * -1일 경우 무한대 )
+
+
+-- 예시
+CREATE DATABASE wavdb
+WITH 
+OWNER = wavdb
+TEMPLATE = template0
+ENCODING = 'UTF8'
+LC_COLLATE = 'C'
+LC_CTYPE = 'C'
+CONNECTION LIMIT = -1;
+	
+
+
+인코딩을 'UTF8'로 설정하기 위해서는 template 값을 0 (template0)으로 설정 후
+ENCODING 옵션 값이 UTF8로 추가 지정해준다( ENCODING = 'UTF8' )
+
+만약 기본 default 템플릿(template1)을 사용한다고 하면 
+
+
+
+#별첨_1
+
+■ template0 정리
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+※ 데이터베이스 생성 시 옵션 값들을 원하는대로 설정하려면 템플릿 옵션 값을 template0 으로 주면된다.
+※ LC_COLLATE 값을 반드시 UTF8로 주어야하기 때문에 초기 데이터베이스 생성 시 반드시 template0의 옵션으로 데이터베이스를 생성해야 함.
+
+ex) 
+   CREATE DATABASE wavdb
+   WITH 
+   OWNER = wavdb
+   TEMPLATE = template0
+   ENCODING = 'UTF8'
+   LC_COLLATE = 'C'
+   LC_CTYPE = 'C'
+   CONNECTION LIMIT = -1;
+
+   
+-- 데이터베이스 생성 결과
+
+     이름      |    소유주    |  인코딩   | Collate | Ctype | ICU |          액세스 권한          |  크기   | 테이블스페이스 |                    설명
+ wavdb         | wavdb        | UTF8      | C       | C     |     |                               | 11 MB   | pg_default     |
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------- 
+
+
+■ template1 정리
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+※ 데이터베이스 생성 시 기본 default 템플릿은 template1 이다
+
+1) 옵션없이 데이터베이스 생성
+CREATE DATABASE 데이터베이스명;
+ex) CREATE DATABASE test2;
+
+--> 만약 위와 같이 데이터베이스 생성 시 아무런 옵션을 주지 않는다면 아래와 같은 각각의 컬럼에 대한 값으로 기본 생성됨.
+
+■ 이름 : 데이터베이스명
+■ 소유주 : DB가 enterprisedb이면 enterprisedb, postgres이면 postgres
+■ 인코딩 : SQL_ASCII ( default )
+■ Collate : C ( default )
+■ Ctype : C ( default )
+■ 테이블스페이스 : pg_default
+
+-- 데이터베이스 생성 결과
+
+     이름      |    소유주    |  인코딩   | Collate | Ctype | ICU |          액세스 권한          |  크기   | 테이블스페이스 |                    설명
+ test2         | enterprisedb | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+
+
+2) 옵션을 사용하여 데이터베이스 생성
+ex) 
+   CREATE DATABASE wav10
+   WITH 
+   OWNER = wavdb
+   TEMPLATE = template1
+   LC_COLLATE = 'C'
+   LC_CTYPE = 'C'
+   CONNECTION LIMIT = -1;
+
+■ 이름 : 데이터베이스명
+■ 소유주 : DB가 enterprisedb이면 enterprisedb, postgres이면 postgres
+■ 인코딩 : SQL_ASCII ( default )
+■ Collate : C ( default )
+■ Ctype : C ( default )
+■ 테이블스페이스 : pg_default
+
+   
+-- 데이터베이스 생성 결과
+
+     이름      |    소유주    |  인코딩   | Collate | Ctype | ICU |          액세스 권한          |  크기   | 테이블스페이스 |                    설명
+ wav10         | wavdb        | SQL_ASCII | C       | C     |     |                               | 11 MB   | pg_default     |
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 

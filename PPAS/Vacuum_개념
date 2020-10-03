@@ -1,0 +1,76 @@
+■ Vacuum 개념
+
+- PAS에서는 테이블의 Update와 Delter 수행 시 row를 바로 반환하지 않음
+- 테이블에 DML이 계속 발생하게 되면, 데이터 블록에는 쓸모없는 이전 로우들이 끊임 없이 생길 것이고
+  블록에 자료를 다 쓰면, 새로운 블록을 끊임 없이 만들 것이고, 이렇게 되면 데이터 저장 공간은 계속 늘어남.
+  --> 이를 방지하기 위해 vacuum 기능 제공
+  
+----------------------------------------------------------------------------
+- vacuum : delete, update 된 row를 재사용 + 트랜잭션 ID 회수
+- vacuum full : delete, update 된 row를 반환하고 단편화 제거 + 트랜잭션 ID 회수
+- autovacuum : analyze + vacuum + 트랜잭션 ID 회수
+----------------------------------------------------------------------------
+
+▫_fsm : free space map, 블록의 빈 공간 정보를 보관하고 있음. vacuum 작업이 끝나면 생성됨. 
+        vacuum 작업을 보다 빠르게 하기 위해서, 자료 조작 작업을 빠르게 하기 위해서 사용
+
+▫_vm : visibility map, 실제 사용하는 자료의 정보만 보관하고 있음. 
+select full sequence scan 작업을 보다 빠르게 할 때 사용. 이 파일도 vacuum 작업이 끝나면 만들어짐
+
+
+--1) vacuum
+사용자는 vacuum 명령으로 수동으로 특정 테이블의 더 이상 쓰지 않는 row의 정리 작업을 할 수 있음. 이 작업은 주로, 대량 delete, update 작업이 일어난 경우, autovacuum 프로세스는 다른 테이블 작업을 하고 있고, 빨리 테이블 정리 작업을 해야 하는 상황일 때 이용
+vacuum 작업이 끝나게 되면, 사용되는 row를 제외하고는 모두 free space 로 정리하며, 다른 insert 작업이나, update 작업이 일어나면, 다른 블록을 사용하지 않고, 해당 블록 안에서 그 빈 공간에 자료를 저장
+vacuum 작업은 그 작업 끝에 fsm 파일과, vm 파일을 만듦. vm파일은 select 작업에서 full sequence scan 작업 비용을 최소화하고, fsm 파일은 insert, update 작업에서 free space 사용 비용을 최소화 함
+vacuum은 ShareUpdateExclusiveLock 을 획득하며, 변경된 row를 재사용 가능하도록 표시만 해두어 다음 작업 시 사용 가능
+
+
+■ 성능문제
+-- pg_stat_all_tables ( 테이블의 통계정보를 확인하여 Maintenance 작업을 진행 )
+- last_vacuum / last_autovacuum / last_analyze / last_autoanalyze 가 실행된지 오래됐을 경우,
+  통계 정보가 정확하지 않고 FSM/VM작업이 이루어지지 않아 성능에 문제가 생길 수 있음
+  
+vanilla=# select * from pg_stat_all_tables where relname = 'tb_agnc_loyalty_trns';
+-[ RECORD 1 ]-------+---------------------------------
+relid               | 31522069
+schemaname          | vaniadm
+relname             | tb_agnc_loyalty_trns
+seq_scan            | 215
+seq_tup_read        | 85250119
+idx_scan            | 19846148
+idx_tup_fetch       | 1692903869476
+n_tup_ins           | 635
+n_tup_upd           | 565778
+n_tup_del           | 0
+n_tup_hot_upd       | 0
+n_live_tup          | 564781
+n_dead_tup          | 316
+n_mod_since_analyze | 426
+last_vacuum         |
+last_autovacuum     | 07-FEB-19 13:31:39.00682 +09:00
+last_analyze        |
+last_autoanalyze    | 07-FEB-19 13:31:52.311927 +09:00
+vacuum_count        | 0
+autovacuum_count    | 1
+analyze_count       | 0
+autoanalyze_count   | 1
+
+: seq_scan: 테이블의 seq_scan 횟수
+: seq_tup_read: seq_scan에 의해 읽은 행 수
+: idx_scan: 테이블의 인덱스 스캔 횟수
+: idx_tup_fetch: 인덱스 스캔에서 추출 된 유효한 행
+: n_tup_in: 테이블에 삽입된 행 수
+: n_tup_upd: 테이블에서 업데이트 된 행
+: n_tup_del: 테이블에서 삭제 된 행
+: n_tup_hot_upd: 테이블 HOT(Heap Only Tuple)로 업데이트 된 행
+: n_live_tup: 테이블의 유효한 행
+: n_dead_tup: 테이블에서 지워진 행
+
+-------------------------------------------------------------------------------------------------
+
+-Postmaster 프로세스와 백그라운드 프로세스가 정상적으로 실행 중인지 확인
+–대량의 트랜잭션 발생을 할 경우 “autovacuum: VACUUM Table_name (to prevent wraparound” 라는 프로세스가 발생하는 지 확인하고, 발생할 경우 명시적으로 VACUUM 작업 수행
+–세션 프로세스는 idle in transaction 상태인지 확인
+
+
+
